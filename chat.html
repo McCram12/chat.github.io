@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+      font-family: Arial, sans-serif;
+    }
+
+    .chat-container {
+      border: 1px solid #ccc;
+      width: 500px;
+      height: 600px;
+      overflow: auto;
+      padding: 10px;
+      background-color: #fff;
+    }
+
+    .message {
+      background-color: #f1f1f1;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+
+    .user-message {
+      background-color: #d9edf7;
+    }
+
+    .system-message {
+      text-align: center;
+      font-style: italic;
+      color: #888;
+    }
+
+    .chat-form {
+      margin-top: 20px;
+    }
+
+    .chat-form .emojionearea {
+      width: 100%;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      overflow-y: auto !important;
+    }
+
+    .chat-form button {
+      margin-top: 10px;
+      padding: 5px 10px;
+      font-size: 14px;
+      background-color: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .chat-form button:hover {
+      background-color: #45a049;
+    }
+
+    .name-button {
+      margin-top: 10px;
+      padding: 5px 10px;
+      font-size: 14px;
+      background-color: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .name-button:hover {
+      background-color: #2980b9;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chatContainer"></div>
+  <form class="chat-form" onsubmit="sendMessage(event)">
+    <textarea id="messageInput" placeholder="Nachricht eingeben" class="emojionearea"></textarea>
+    <button type="submit">Senden</button>
+  </form>
+  <button class="name-button" onclick="changeName()">Name ändern</button>
+  <button onclick="createRoom()">Raum erstellen</button>
+  <button onclick="joinRoom()">Raum betreten</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/emojionearea/dist/emojionearea.min.js"></script>
+  <script>
+    let roomCode = '';
+    let tabIsActive = true;
+    let roomMessages = [];
+    let messageInput = document.getElementById('messageInput');
+    let name = '';
+
+    window.addEventListener('focus', function() {
+      tabIsActive = true;
+      document.title = "Chat";
+    });
+
+    window.addEventListener('blur', function() {
+      tabIsActive = false;
+    });
+
+    function sendMessage(event) {
+      event.preventDefault();
+      const message = messageInput.value.trim();
+
+      if (message !== '') {
+        if (message.startsWith('#col ')) {
+          const colorValue = message.substr(5);
+          changeTextColor(colorValue);
+        } else if (message.startsWith('#net ')) {
+          const url = message.substr(5);
+          appendLink(url);
+        } else if (message === '#mon') {
+          clearChat();
+        } else {
+          appendMessage(message, true);
+        }
+        
+        messageInput.value = '';
+
+        // Synchronisieren der Nachrichten zwischen den Tabs
+        roomMessages.push({ message: message, isUser: true, name: name });
+        localStorage.setItem('roomMessages', JSON.stringify(roomMessages));
+
+        // Nachricht an andere Tabs senden
+        const messageData = { type: 'message', message: message, name: name };
+        broadcastMessage(messageData);
+      }
+    }
+
+    function appendMessage(message, isUser, senderName) {
+      const chatContainer = document.getElementById('chatContainer');
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message');
+
+      if (isUser) {
+        messageElement.classList.add('user-message');
+        messageElement.textContent = message;
+      } else {
+        const messageContentElement = document.createElement('span');
+        messageContentElement.textContent = message;
+
+        const senderElement = document.createElement('span');
+        senderElement.classList.add('sender-name');
+        senderElement.textContent = senderName;
+
+        messageElement.appendChild(senderElement);
+        messageElement.appendChild(document.createTextNode(': '));
+        messageElement.appendChild(messageContentElement);
+      }
+
+      chatContainer.appendChild(messageElement);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function changeTextColor(colorValue) {
+      const chatContainer = document.getElementById('chatContainer');
+      chatContainer.style.color = colorValue;
+    }
+
+    function appendLink(url) {
+      const chatContainer = document.getElementById('chatContainer');
+      const linkElement = document.createElement('a');
+      linkElement.href = url;
+      linkElement.target = '_blank';
+      linkElement.textContent = url;
+
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message');
+      messageElement.appendChild(linkElement);
+
+      chatContainer.appendChild(messageElement);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function clearChat() {
+      const chatContainer = document.getElementById('chatContainer');
+      chatContainer.innerHTML = '';
+      roomMessages = [];
+      localStorage.removeItem('roomMessages');
+    }
+
+    function createRoom() {
+      const roomId = generateRandomNumber(10000, 99999);
+      const roomName = `Chatroom ${roomId}`;
+      clearChat();
+      appendMessage(`Neuer Chatraum erstellt: ${roomName}`, false, 'System');
+      roomCode = roomId.toString();
+      localStorage.setItem('roomCode', roomCode);
+    }
+
+    function joinRoom() {
+      const inputCode = prompt('Geben Sie den Raumcode ein:');
+      const storedCode = localStorage.getItem('roomCode');
+
+      if (inputCode !== null) {
+        if (inputCode === storedCode) {
+          alert('Raum beigetreten!');
+          roomCode = storedCode;
+          const storedMessages = localStorage.getItem('roomMessages');
+          if (storedMessages) {
+            roomMessages = JSON.parse(storedMessages);
+            roomMessages.forEach(function(item) {
+              appendMessage(item.message, item.isUser, item.name);
+            });
+          }
+        } else {
+          alert('Ungültiger Raumcode!');
+        }
+      }
+    }
+
+    function changeName() {
+      name = prompt('Geben Sie Ihren Namen ein:');
+    }
+
+    function generateRandomNumber(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // Broadcast Channel API für die Kommunikation zwischen Tabs
+    let broadcastChannel;
+
+    function createBroadcastChannel() {
+      if (broadcastChannel) {
+        broadcastChannel.close();
+      }
+
+      broadcastChannel = new BroadcastChannel('chatroom');
+      broadcastChannel.onmessage = function(event) {
+        if (event.data && event.data.type === 'message' && !tabIsActive) {
+          const receivedMessage = event.data.message;
+          const receivedName = event.data.name;
+          appendMessage(receivedMessage, false, receivedName);
+        }
+      };
+    }
+
+    function broadcastMessage(message) {
+      if (broadcastChannel) {
+        broadcastChannel.postMessage(message);
+      }
+    }
+
+    // Initialisierung
+    createBroadcastChannel();
+  </script>
+</body>
+</html>
